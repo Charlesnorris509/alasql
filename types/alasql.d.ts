@@ -3,26 +3,28 @@
 declare module 'alasql' {
 	import * as xlsx from 'xlsx';
 
+	// Callback interface for SQL execution results
 	interface AlaSQLCallback {
 		(data?: any, err?: Error): void;
 	}
 
+	// Options for AlaSQL execution configuration
 	interface AlaSQLOptions {
 		errorlog: boolean;
 		valueof: boolean;
-		dropifnotexists: boolean; // drop database in any case
-		datetimeformat: string; // how to handle DATE and DATETIME types
-		casesensitive: boolean; // table and column names are case sensitive and converted to lower-case
-		logtarget: string; // target for log. Values: 'console', 'output', 'id' of html tag
-		logprompt: boolean; // print SQL at log
-		modifier: any; // values: RECORDSET, VALUE, ROW, COLUMN, MATRIX, TEXTSTRING, INDEX
-		columnlookup: number; // how many rows to lookup to define columns
-		autovertex: boolean; // create vertex if not found
-		usedbo: boolean; // use dbo as current database (for partial T-SQL comaptibility)
-		autocommit: boolean; // the AUTOCOMMIT ON | OFF
-		cache: boolean; // use cache
-		nocount: boolean; // for SET NOCOUNT OFF
-		nan: boolean; // check for NaN and convert it to undefined
+		dropifnotexists: boolean; // Drop database if it doesn't exist
+		datetimeformat: string; // Format for DATE and DATETIME types
+		casesensitive: boolean; // Case sensitivity for table and column names
+		logtarget: string; // Target for logs ('console', 'output', or HTML element ID)
+		logprompt: boolean; // Log SQL prompt
+		modifier: 'RECORDSET' | 'VALUE' | 'ROW' | 'COLUMN' | 'MATRIX' | 'TEXTSTRING' | 'INDEX' | any; // Query result format
+		columnlookup: number; // Rows to scan for column definitions
+		autovertex: boolean; // Automatically create vertex if not found
+		usedbo: boolean; // Use dbo as the default database (for T-SQL compatibility)
+		autocommit: boolean; // Toggle AUTOCOMMIT mode
+		cache: boolean; // Enable query cache
+		nocount: boolean; // Toggle NOCOUNT for SET statement
+		nan: boolean; // Convert NaN to undefined
 		angularjs: boolean;
 		tsql: boolean;
 		mysql: boolean;
@@ -33,128 +35,103 @@ declare module 'alasql' {
 		excel: any;
 	}
 
-	// compiled Statement
+	// Compiled statement type with optional parameters
 	interface AlaSQLStatement {
 		(params?: any, cb?: AlaSQLCallback, scope?: any): any;
 	}
 
-	// abstract Syntax Tree
+	// Abstract Syntax Tree representation of a query
 	interface AlaSQLAST {
 		compile(databaseid: string): AlaSQLStatement;
 	}
 
-	// https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/es6-promise/es6-promise.d.ts
-	interface Thenable<T> {
-		then<U>(
-			onFulfilled?: (value: T) => U | Thenable<U>,
-			onRejected?: (error: any) => U | Thenable<U>
-		): Thenable<U>;
-		then<U>(
-			onFulfilled?: (value: T) => U | Thenable<U>,
-			onRejected?: (error: any) => void
-		): Thenable<U>;
-		catch<U>(onRejected?: (error: any) => U | Thenable<U>): Thenable<U>;
-	}
+	// User-defined function for custom SQL functions
+	type userDefinedFunction = (...args: any[]) => any;
 
-	// see https://github.com/alasql/alasql/wiki/User%20Defined%20Functions
-	interface userDefinedFunction {
-		(...x: any[]): any;
-	}
-
+	// Lookup for user-defined functions
 	interface userDefinedFunctionLookUp {
-		[x: string]: userDefinedFunction;
+		[name: string]: userDefinedFunction;
 	}
 
-	// see https://github.com/alasql/alasql/wiki/User%20Defined%20Functions
-	interface userAggregator {
-		(value: any, accumulator: any, stage: number): any;
-	}
+	// Aggregator function used in SQL queries
+	type userAggregator = (value: any, accumulator: any, stage: number) => any;
 
+	// Lookup for user-defined aggregators
 	interface userAggregatorLookUp {
-		[x: string]: userAggregator;
+		[name: string]: userAggregator;
 	}
 
+	// Function to handle custom FROM data sources
 	interface userFromFunction {
-		(dataReference: any, options: any, callback: any, index: any, query: any): any;
+		(dataReference: any, options: any, callback: AlaSQLCallback, index: any, query: any): any;
 	}
 
+	// Lookup for user-defined FROM functions
 	interface userFromFunctionLookUp {
-		[x: string]: userFromFunction;
+		[name: string]: userFromFunction;
 	}
 
 	/**
-	 * AlaSQL database object. This is a lightweight implimentation
-	 *
-	 * @interface database
+	 * AlaSQL database object - a lightweight database implementation.
 	 */
 	interface database {
 		/**
-		 * The database ID.
-		 *
-		 * @type {string}
-		 * @memberof database
+		 * Database identifier.
 		 */
 		databaseid: string;
 
 		/**
-		 * The collection of tables in the database.
-		 *
-		 * @type {tableLookUp}
-		 * @memberof database
+		 * Collection of tables in the database.
 		 */
 		tables: tableLookUp;
 	}
 
 	/**
-	 * AlaSQL table object. This is a lightweight implimentation
-	 *
-	 * @interface table
+	 * AlaSQL table object - stores tabular data for querying.
 	 */
 	interface table {
 		/**
-		 * The array of data stored in the table which can be queried
-		 *
-		 * @type {any[]}
-		 * @memberof table
+		 * Array of data rows within the table.
 		 */
 		data: any[];
 	}
 
 	/**
-	 * AlaSQL database dictionary
-	 *
-	 * @interface databaseLookUp
+	 * Lookup table for multiple databases.
 	 */
 	interface databaseLookUp {
 		[databaseName: string]: database;
 	}
 
 	/**
-	 * AlaSQL table dictionary
-	 *
-	 * @interface tableLookUp
+	 * Lookup table for multiple tables.
 	 */
 	interface tableLookUp {
 		[tableName: string]: table;
 	}
 
+	/**
+	 * Interface for database configuration and manipulation methods.
+	 */
 	interface Database {
 		new (databaseid?: string): Database;
 		databaseid: string;
 		dbversion: number;
-		tables: {[key: string]: any};
-		views: {[key: string]: any};
-		triggers: {[key: string]: any};
-		indices: {[key: string]: any};
-		objects: {[key: string]: any};
+		tables: { [key: string]: any };
+		views: { [key: string]: any };
+		triggers: { [key: string]: any };
+		indices: { [key: string]: any };
+		objects: { [key: string]: any };
 		counter: number;
-		sqlCache: {[key: string]: any};
+		sqlCache: { [key: string]: any };
 		sqlCacheSize: number;
-		astCache: {[key: string]: any};
+		astCache: { [key: string]: any };
 		resetSqlCache: () => void;
-		exec: (sql: string, params?: object, cb?: Function) => any;
+		exec: (sql: string, params?: object, cb?: AlaSQLCallback) => any;
 		autoval: (tablename: string, colname: string, getNext: boolean) => any;
 	}
+
+	// Core AlaSQL interface, encapsulating query functions and configurations
 	interface AlaSQL {
 		options: AlaSQLOptions;
 		error: Error;
@@ -172,44 +149,29 @@ declare module 'alasql' {
 		};
 
 		/**
-		 * Array of databases in the AlaSQL object.
-		 *
-		 * @type {databaseLookUp}
-		 * @memberof AlaSQL
+		 * Dictionary of databases managed by AlaSQL.
 		 */
 		databases: databaseLookUp;
 
 		/**
-		 * Equivalent to alasql('USE '+databaseid). This will change the current
-		 * database to the one specified. This will update the useid property and
-		 * the tables property.
+		 * Switches the current database context.
 		 *
-		 * @param {string} databaseid
-		 * @memberof AlaSQL
+		 * @param databaseid - The ID of the database to switch to.
 		 */
 		use(databaseid: string): void;
 
 		/**
-		 * The current database ID. If no database is selected, this is the
-		 * default database ID (called alasql).
-		 *
-		 * @type {string}
-		 * @memberof AlaSQL
+		 * Current active database ID. Defaults to 'alasql' if none specified.
 		 */
 		useid: string;
 
 		/**
-		 * Array of the tables in the default database (called alasql). If
-		 * the database is changes via a USE statement or the use method, this
-		 * becomes the tables in the new database.
-		 *
-		 * @type {tableLookUp}
-		 * @memberof AlaSQL
+		 * Collection of tables in the current database.
 		 */
 		tables: tableLookUp;
 	}
 
+	// Export the AlaSQL object for external usage
 	const alasql: AlaSQL;
-
 	export = alasql;
 }
