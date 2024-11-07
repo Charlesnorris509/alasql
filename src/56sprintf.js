@@ -43,94 +43,80 @@
  *       using powers of 1000.
  */
 
-stdfn.SPRINTF = function () {
-	var args = arguments;
-	var index = 0;
+/**
+ * SPRINTF(format, argument_list)
+ *
+ * A string formatting function similar to C/C++, PHP, and Perl.
+ * The conversion specification is defined as:
+ *
+ * %[index][alignment][padding][width][precision]type
+ */
 
-	var x;
-	var ins;
-	var fn;
+stdfn.SPRINTF = function (...args) {
+	// Using spread syntax for function arguments for better readability and flexibility
+	let index = 0;
+
+	let x;
+	let ins;
 
 	/*
-	 * The callback function accepts the following properties
-	 *      x.index contains the substring position found at the origin string
-	 *      x[0] contains the found substring
-	 *      x[1] contains the index specifier (as \d+\$ or \d+#)
-	 *      x[2] contains the alignment specifier ("+" or "-" or empty)
-	 *      x[3] contains the padding specifier (space char, "0" or defined as '.)
-	 *      x[4] contains the width specifier (as \d*)
-	 *      x[5] contains the floating-point precision specifier (as \.\d*)
-	 *      x[6] contains the type specifier (as [bcdfosuxX])
+	 * Callback function to handle each match in the format string.
 	 */
-	return args[0].replace(stdfn.SPRINTF.re, function () {
-		if (arguments[0] == '%%') {
-			return '%';
+	return args[0].replace(stdfn.SPRINTF.re, (...matchArgs) => {
+		if (matchArgs[0] === '%%') {
+			return '%'; // Return literal percent sign
 		}
 
-		x = [];
-		for (var i = 0; i < arguments.length; i++) {
-			x[i] = arguments[i] || '';
-		}
-		x[3] = x[3].slice(-1) || ' ';
+		x = matchArgs.slice(1).map(arg => arg || ''); // Map to handle undefined matches
+		x[3] = x[3].slice(-1) || ' '; // Default padding character is space
 
+		// Use the indexed argument if specified, otherwise the next argument
 		ins = args[+x[1] ? x[1] - 1 : index++];
-		//              index++;
-
-		return alasql.stdfn.SPRINTF[x[6]](ins, x);
+		return alasql.stdfn.SPRINTF[x[6]](ins, x); // Execute the corresponding function based on type specifier
 	});
 };
 
+// Regular expression updated with comments for readability
 stdfn.SPRINTF.re = /%%|%(?:(\d+)[\$#])?([+-])?('.|0| )?(\d*)(?:\.(\d+))?([bcdfosuxXhH])/g;
 
-stdfn.SPRINTF.b = function (ins, x) {
-	return Number(ins).bin(x[2] + x[4], x[3]);
-};
-stdfn.SPRINTF.c = function (ins, x) {
-	return String.fromCharCode(ins).padding(x[2] + x[4], x[3]);
-};
-stdfn.SPRINTF.d = stdfn.SPRINTF.u = function (ins, x) {
-	return Number(ins).radix(0x0a, x[2] + x[4], x[3]);
-};
-stdfn.SPRINTF.f = function (ins, x) {
-	var ins = Number(ins);
-	//      var fn = String.prototype.padding;
+/**
+ * Type-specific formatter functions
+ */
+stdfn.SPRINTF.b = (ins, x) => Number(ins).bin(x[2] + x[4], x[3]); // Binary representation
+
+stdfn.SPRINTF.c = (ins, x) => String.fromCharCode(ins).padding(x[2] + x[4], x[3]); // Character based on ASCII code
+
+stdfn.SPRINTF.d = stdfn.SPRINTF.u = (ins, x) => Number(ins).radix(10, x[2] + x[4], x[3]); // Decimal representation
+
+stdfn.SPRINTF.f = (ins, x) => {
+	let value = Number(ins);
 	if (x[5]) {
-		ins = ins.toFixed(x[5]);
+		value = value.toFixed(x[5]); // Fixed decimal precision
 	} else if (x[4]) {
-		ins = ins.toExponential(x[4]);
+		value = value.toExponential(x[4]); // Exponential format with specified width
 	} else {
-		ins = ins.toExponential();
+		value = value.toExponential(); // Default exponential format
 	}
-	// Invert sign because this is not number but string
-	x[2] = x[2] == '-' ? '+' : '-';
-	return ins.padding(x[2] + x[4], x[3]);
-	//      return fn.call(ins, x[2] + x[4], x[3]);
+	x[2] = x[2] === '-' ? '+' : '-'; // Adjust alignment for string output
+	return value.padding(x[2] + x[4], x[3]);
 };
-stdfn.SPRINTF.o = function (ins, x) {
-	return Number(ins).oct(x[2] + x[4], x[3]);
+
+stdfn.SPRINTF.o = (ins, x) => Number(ins).oct(x[2] + x[4], x[3]); // Octal representation
+
+stdfn.SPRINTF.s = (ins, x) => String(ins).padding(x[2] + x[4], x[3]); // String representation with padding
+
+stdfn.SPRINTF.x = (ins, x) => Number(ins).hexl(x[2] + x[4], x[3]); // Lowercase hexadecimal
+
+stdfn.SPRINTF.X = (ins, x) => Number(ins).hex(x[2] + x[4], x[3]); // Uppercase hexadecimal
+
+stdfn.SPRINTF.h = (ins, x) => {
+	let cleanIns = String(ins).replace(/,/g, ''); // Remove commas for number parsing
+	x[2] = x[2] === '-' ? '+' : '-'; // Adjust alignment for string output
+	return Number(cleanIns).human(x[5], true).padding(x[2] + x[4], x[3]); // Human-readable format in powers of 1024
 };
-stdfn.SPRINTF.s = function (ins, x) {
-	return String(ins).padding(x[2] + x[4], x[3]);
-};
-stdfn.SPRINTF.x = function (ins, x) {
-	return Number(ins).hexl(x[2] + x[4], x[3]);
-};
-stdfn.SPRINTF.X = function (ins, x) {
-	return Number(ins).hex(x[2] + x[4], x[3]);
-};
-stdfn.SPRINTF.h = function (ins, x) {
-	var ins = String.prototype.replace.call(ins, /,/g, '');
-	// Invert sign because this is not number but string
-	x[2] = x[2] == '-' ? '+' : '-';
-	return Number(ins)
-		.human(x[5], true)
-		.padding(x[2] + x[4], x[3]);
-};
-stdfn.SPRINTF.H = function (ins, x) {
-	var ins = String.prototype.replace.call(ins, /,/g, '');
-	// Invert sign because this is not number but string
-	x[2] = x[2] == '-' ? '+' : '-';
-	return Number(ins)
-		.human(x[5], false)
-		.padding(x[2] + x[4], x[3]);
+
+stdfn.SPRINTF.H = (ins, x) => {
+	let cleanIns = String(ins).replace(/,/g, ''); // Remove commas for number parsing
+	x[2] = x[2] === '-' ? '+' : '-'; // Adjust alignment for string output
+	return Number(cleanIns).human(x[5], false).padding(x[2] + x[4], x[3]); // Human-readable format in powers of 1000
 };
