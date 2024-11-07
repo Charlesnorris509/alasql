@@ -10,17 +10,16 @@
 /* global yy alasql */
 
 // CREATE DATABASE databaseid
-yy.CreateDatabase = function (params) {
-	return Object.assign(this, params);
-};
+yy.CreateDatabase = (params) => Object.assign(this, params); // Updated to arrow function
+
 yy.CreateDatabase.prototype.toString = function () {
-	let s = 'CREATE '; // Ensure there's a space after CREATE
+	let s = 'CREATE '; // Added space after 'CREATE' for clarity
 	if (this.engineid) s += `${this.engineid} `;
 	s += 'DATABASE ';
 	if (this.ifnotexists) s += 'IF NOT EXISTS ';
 	s += `${this.databaseid} `;
 
-	if (this.args && this.args.length > 0) {
+	if (this.args?.length) { // Optional chaining for args presence check
 		s += `(${this.args.map(arg => arg.toString()).join(', ')}) `;
 	}
 	if (this.as) s += `AS ${this.as}`;
@@ -28,49 +27,32 @@ yy.CreateDatabase.prototype.toString = function () {
 };
 
 yy.CreateDatabase.prototype.execute = function (databaseid, params, cb) {
-	var args;
-	if (this.args && this.args.length > 0) {
-		args = this.args.map(function (arg) {
-			// console.log(346235, arg.toJS());
-			return new Function('params,alasql', 'var y;return ' + arg.toJS())(params, alasql);
-		});
+	let args;
+	if (this.args?.length) { // Optional chaining and let for block scoping
+		args = this.args.map(arg => new Function('params,alasql', `var y;return ${arg.toJS()}`)(params, alasql)); // Template literals for readability
 	}
 	if (this.engineid) {
-		var res = alasql.engines[this.engineid].createDatabase(
-			this.databaseid,
-			this.args,
-			this.ifnotexists,
-			this.as,
-			cb
-		);
-		return res;
+		return alasql.engines[this.engineid].createDatabase(this.databaseid, this.args, this.ifnotexists, this.as, cb);
 	} else {
-		var dbid = this.databaseid;
+		const dbid = this.databaseid;
 		if (alasql.databases[dbid]) {
-			throw new Error("Database '" + dbid + "' already exists");
+			throw new Error(`Database '${dbid}' already exists`);
 		}
-		var a = new alasql.Database(dbid);
-		var res = 1;
-		if (cb) return cb(res);
-		return res;
+		const dbInstance = new alasql.Database(dbid); // Renamed variable for clarity
+		const res = 1;
+		return cb ? cb(res) : res;
 	}
 };
 
 // CREATE DATABASE databaseid
-yy.AttachDatabase = function (params) {
-	return Object.assign(this, params);
-};
+yy.AttachDatabase = (params) => Object.assign(this, params); // Updated to arrow function
+
 yy.AttachDatabase.prototype.toString = function (args) {
 	let s = 'ATTACH';
 	if (this.engineid) s += ` ${this.engineid}`;
 	s += ` DATABASE ${this.databaseid}`;
-	// TODO add params
-	if (args) {
-		s += '(';
-		if (args.length > 0) {
-			s += args.map(arg => arg.toString()).join(', ');
-		}
-		s += ')';
+	if (args?.length) { // Optional chaining and length check
+		s += `(${args.map(arg => arg.toString()).join(', ')})`;
 	}
 	if (this.as) s += ` AS ${this.as}`;
 	return s;
@@ -78,135 +60,99 @@ yy.AttachDatabase.prototype.toString = function (args) {
 
 yy.AttachDatabase.prototype.execute = function (databaseid, params, cb) {
 	if (!alasql.engines[this.engineid]) {
-		throw new Error('Engine "' + this.engineid + '" is not defined.');
+		throw new Error(`Engine "${this.engineid}" is not defined.`);
 	}
-	var res = alasql.engines[this.engineid].attachDatabase(
-		this.databaseid,
-		this.as,
-		this.args,
-		params,
-		cb
-	);
-	return res;
+	return alasql.engines[this.engineid].attachDatabase(this.databaseid, this.as, this.args, params, cb);
 };
 
 // CREATE DATABASE databaseid
-yy.DetachDatabase = function (params) {
-	return Object.assign(this, params);
-};
+yy.DetachDatabase = (params) => Object.assign(this, params); // Updated to arrow function
+
 yy.DetachDatabase.prototype.toString = function () {
-	var s = 'DETACH';
-	s += ' DATABASE' + ' ' + this.databaseid;
-	return s;
+	return `DETACH DATABASE ${this.databaseid}`; // Template literal for consistency
 };
-//yy.CreateDatabase.prototype.compile = returnUndefined;
+
 yy.DetachDatabase.prototype.execute = function (databaseid, params, cb) {
-	if (!alasql.databases[this.databaseid].engineid) {
-		throw new Error('Cannot detach database "' + this.engineid + '", because it was not attached.');
+	if (!alasql.databases[this.databaseid]?.engineid) {
+		throw new Error(`Cannot detach database "${this.databaseid}", because it was not attached.`); // Updated error message
 	}
-	var res;
 
-	var dbid = this.databaseid;
-
+	const dbid = this.databaseid;
 	if (dbid === alasql.DEFAULTDATABASEID) {
 		throw new Error('Drop of default database is prohibited');
 	}
 
-	if (!alasql.databases[dbid]) {
-		if (!this.ifexists) {
-			throw new Error("Database '" + dbid + "' does not exist");
-		} else {
-			res = 0;
-		}
+	let res;
+	const dbInstance = alasql.databases[dbid]; // Renamed for clarity
+	if (!dbInstance) {
+		res = this.ifexists ? 0 : (() => { throw new Error(`Database '${dbid}' does not exist`); })();
 	} else {
-		// Usually databases are detached and then dropped. Detaching will delete
-		// the database object from memory. While this is OK for in-memory and
-		// other persistent databases, for FileStorage DBs, we will
-		// not be able to delete the DB file (.json) since we would have lost
-		// the filename by deleting the in-memory database object here.
-		// For this reason, to delete the associated JSON file,
-		// keeping the name of the file alone as a property inside the db object
-		// until it gets DROPped subsequently (only for FileStorage DBs)
-		var isFS = alasql.databases[dbid].engineid && alasql.databases[dbid].engineid == 'FILESTORAGE',
-			filename = alasql.databases[dbid].filename || '';
+		const isFS = dbInstance.engineid === 'FILESTORAGE';
+		const filename = dbInstance.filename || '';
 
 		delete alasql.databases[dbid];
 
 		if (isFS) {
-			// Create a detached FS database
-			alasql.databases[dbid] = {};
-			alasql.databases[dbid].isDetached = true;
-			alasql.databases[dbid].filename = filename;
+			alasql.databases[dbid] = { isDetached: true, filename }; // Keep file name for potential DROP
 		}
 
-		if (dbid === alasql.useid) {
-			alasql.use();
-		}
+		if (dbid === alasql.useid) alasql.use(); // Reset to default if detached
 		res = 1;
 	}
+
 	if (cb) cb(res);
 	return res;
 };
 
-// USE DATABSE databaseid
-// USE databaseid
-yy.UseDatabase = function (params) {
-	return Object.assign(this, params);
-};
+// USE DATABASE databaseid
+yy.UseDatabase = (params) => Object.assign(this, params); // Updated to arrow function
+
 yy.UseDatabase.prototype.toString = function () {
-	return 'USE' + ' ' + 'DATABASE' + ' ' + this.databaseid;
+	return `USE DATABASE ${this.databaseid}`; // Template literal for consistency
 };
-//yy.UseDatabase.prototype.compile = returnUndefined;
+
 yy.UseDatabase.prototype.execute = function (databaseid, params, cb) {
-	var dbid = this.databaseid;
+	const dbid = this.databaseid;
 	if (!alasql.databases[dbid]) {
-		throw new Error("Database '" + dbid + "' does not exist");
+		throw new Error(`Database '${dbid}' does not exist`);
 	}
 	alasql.use(dbid);
-	var res = 1;
+	const res = 1;
 	if (cb) cb(res);
 	return res;
 };
 
 // DROP DATABASE databaseid
-yy.DropDatabase = function (params) {
-	return Object.assign(this, params);
-};
+yy.DropDatabase = (params) => Object.assign(this, params); // Updated to arrow function
+
 yy.DropDatabase.prototype.toString = function () {
-	var s = 'DROP';
-	if (this.ifexists) s += ' IF EXISTS';
-	s += ' DATABASE ' + this.databaseid;
-	return s;
+	return `DROP${this.ifexists ? ' IF EXISTS' : ''} DATABASE ${this.databaseid}`; // Template literal with conditional
 };
-//yy.DropDatabase.prototype.compile = returnUndefined;
+
 yy.DropDatabase.prototype.execute = function (databaseid, params, cb) {
 	if (this.engineid) {
 		return alasql.engines[this.engineid].dropDatabase(this.databaseid, this.ifexists, cb);
 	}
-	let res;
 
 	const dbid = this.databaseid;
-
 	if (dbid === alasql.DEFAULTDATABASEID) {
 		throw new Error('Drop of default database is prohibited');
 	}
-	if (!alasql.databases[dbid]) {
-		if (!this.ifexists) {
-			throw new Error(`Database '${dbid}' does not exist`);
-		} else {
-			res = 0;
-		}
-	} else {
-		if (alasql.databases[dbid].engineid) {
-			throw new Error(`Cannot drop database '${dbid}', because it is attached. Detach it.`);
-		}
 
-		delete alasql.databases[dbid];
-		if (dbid === alasql.useid) {
-			alasql.use();
+	let res;
+	const dbInstance = alasql.databases[dbid]; // Renamed for clarity
+
+	if (!dbInstance) {
+		res = this.ifexists ? 0 : (() => { throw new Error(`Database '${dbid}' does not exist`); })();
+	} else {
+		if (dbInstance.engineid) {
+			throw new Error(`Cannot drop database '${dbid}', because it is attached. Detach it first.`);
 		}
+		delete alasql.databases[dbid];
+		if (dbid === alasql.useid) alasql.use(); // Reset current database if it was in use
 		res = 1;
 	}
+
 	if (cb) cb(res);
 	return res;
 };
