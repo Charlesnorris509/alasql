@@ -25,7 +25,7 @@ var utils = (alasql.utils = {});
   NaN         => undefined
 
   */
-function n2u(s) {
+function nanToUndefined(s) { //rename for clarity.
 	return '(y=' + s + ',y===y?y:undefined)';
 }
 
@@ -41,7 +41,7 @@ function n2u(s) {
   NaN,a       => undefined
 
   */
-function und(s, r) {
+function undefinedOrValue(s, r) { //rename for clarity
 	return '(y=' + s + ',typeof y=="undefined"?undefined:' + r + ')';
 }
 
