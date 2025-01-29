@@ -57,6 +57,15 @@
 		alasql().From(data).Where(function(x){return x.a == 10}).exec();
 	 */
 
+	/**
+	 * Main function for executing SQL statements or data operations.
+	 * @param {string|function|object} sql - SQL statement or data object for fluent interface.
+	 * @param {object} [params] - SQL parameters.
+	 * @param {function} [cb] - Callback function.
+	 * @param {object} [scope] - Scope for nested queries.
+	 * @returns {any} - Result data object.
+	 */
+
 	let alasql = function (sql, params, cb, scope) {
 
 		params = params || [];
